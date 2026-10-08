@@ -253,8 +253,10 @@ func getAdGroupMembers(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	headers := &abstractions.RequestHeaders{}
 	headers.Add("ConsistencyLevel", "eventual")
 
+	// Only ids are needed; selecting just them keeps pages small for large groups
 	requestParameters := &groups.ItemMembersRequestBuilderGetQueryParameters{
-		Count: Bool(true),
+		Select: []string{"id"},
+		Count:  Bool(true),
 	}
 
 	config := &groups.ItemMembersRequestBuilderGetRequestConfiguration{

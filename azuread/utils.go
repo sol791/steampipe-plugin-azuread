@@ -3,6 +3,7 @@ package azuread
 import (
 	"context"
 	"os"
+	"strconv"
 
 	"github.com/turbot/steampipe-plugin-sdk/v6/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v6/memoize"
@@ -107,4 +108,14 @@ func Int32(v int32) *int32 {
 // Bool returns a pointer to the bool value passed in.
 func Bool(v bool) *bool {
 	return &v
+}
+
+// nestedTopValue returns the $top page size used for nested Graph calls (e.g. group
+// members/owners). Override with AZUREAD_NESTED_TOP_VALUE (1-998); defaults to 999.
+func nestedTopValue() *int32 {
+	size := int32(999)
+	if v, err := strconv.Atoi(os.Getenv("AZUREAD_NESTED_TOP_VALUE")); err == nil && v > 0 && v < 999 {
+		size = int32(v)
+	}
+	return &size
 }
