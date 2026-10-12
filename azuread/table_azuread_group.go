@@ -47,7 +47,16 @@ func tableAzureAdGroup(_ context.Context) *plugin.Table {
 		},
 		// Per-row hydrates are a common source of Graph API throttling
 		HydrateConfig: []plugin.HydrateConfig{
-			{Func: getAdGroupMembers, MaxConcurrency: 1},
+			{
+				Func: getAdGroupMembers,
+				RetryConfig: &plugin.RetryConfig{
+					ShouldRetryErrorFunc: isThrottlingError,
+					MaxAttempts:          10,
+					BackoffAlgorithm:     "Exponential",
+					RetryInterval:        2000,
+					CappedDuration:       60000,
+				},
+			},
 		},
 		Columns: commonColumns([]*plugin.Column{
 			{Name: "display_name", Type: proto.ColumnType_STRING, Description: "The name displayed in the address book for the user. This is usually the combination of the user's first name, middle initial and last name.", Transform: transform.FromMethod("GetDisplayName")},
@@ -288,7 +297,7 @@ func getAdGroupMembers(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	})
 	if err != nil {
 		plugin.Logger(ctx).Error("getAdGroupMembers", "paging_error", err)
-		return nil, err
+		return nil, getErrorObject(err)
 	}
 
 	return memberIds, nil

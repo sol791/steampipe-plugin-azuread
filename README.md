@@ -24,6 +24,14 @@ Run a query:
 select display_name, user_principal_name, user_type from azuread_user;
 ```
 
+## Graph HTTP timeout
+
+Set `AZUREAD_HTTP_TIMEOUT` in the plugin/export process environment to override
+the HTTP client timeout for Microsoft Graph v1.0 requests. Use a positive Go
+duration such as `300s` or `5m`. When unset, the SDK default is left untouched.
+Empty, invalid, zero, or negative values return a configuration error. This does
+not change the Graph beta client timeout or the overall query deadline.
+
 ## Engines
 
 This plugin is available for the following engines:

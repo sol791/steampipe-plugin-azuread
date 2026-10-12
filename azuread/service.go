@@ -10,21 +10,59 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/microsoft/kiota-abstractions-go/authentication"
 	a "github.com/microsoft/kiota-authentication-azure-go"
 	msgraphsdkbeta "github.com/microsoftgraph/msgraph-beta-sdk-go"
 	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
+	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	"github.com/turbot/steampipe-plugin-sdk/v6/plugin"
 )
 
 const (
 	environmentAzureChinaCloud        = "AZURECHINACLOUD"
 	environmentAzureUSGovernmentCloud = "AZUREUSGOVERNMENTCLOUD"
+
+	httpTimeoutEnvVar = "AZUREAD_HTTP_TIMEOUT"
 )
+
+// graphHTTPTimeout returns the timeout from AZUREAD_HTTP_TIMEOUT (a positive Go duration such as
+// "300s" or "5m"). The bool is false when the variable is unset.
+func graphHTTPTimeout() (time.Duration, bool, error) {
+	value, set := os.LookupEnv(httpTimeoutEnvVar)
+	if !set {
+		return 0, false, nil
+	}
+	timeout, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, false, fmt.Errorf("invalid %s: %w", httpTimeoutEnvVar, err)
+	}
+	if timeout <= 0 {
+		return 0, false, fmt.Errorf("%s must be a positive duration", httpTimeoutEnvVar)
+	}
+	return timeout, true, nil
+}
+
+// newGraphRequestAdapter builds the Graph v1.0 adapter. The HTTP client timeout is only
+// overridden when AZUREAD_HTTP_TIMEOUT is set; otherwise the SDK default is left untouched.
+func newGraphRequestAdapter(auth authentication.AuthenticationProvider) (*msgraphsdkgo.GraphRequestAdapter, error) {
+	timeout, set, err := graphHTTPTimeout()
+	if err != nil {
+		return nil, err
+	}
+	if !set {
+		return msgraphsdkgo.NewGraphRequestAdapter(auth)
+	}
+	options := msgraphsdkgo.GetDefaultClientOptions()
+	httpClient := msgraphcore.GetDefaultClient(&options)
+	httpClient.Timeout = timeout
+	return msgraphsdkgo.NewGraphRequestAdapterWithParseNodeFactoryAndSerializationWriterFactoryAndHttpClient(auth, nil, nil, httpClient)
+}
 
 func getCloudConfiguration(environment string) cloud.Configuration {
 	switch environment {
@@ -192,7 +230,7 @@ func GetGraphClient(ctx context.Context, d *plugin.QueryData) (*msgraphsdkgo.Gra
 		return nil, nil, fmt.Errorf("error creating authentication provider: %v", err)
 	}
 
-	adapter, err := msgraphsdkgo.NewGraphRequestAdapter(auth)
+	adapter, err := newGraphRequestAdapter(auth)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating graph adapter: %v", err)
 	}
