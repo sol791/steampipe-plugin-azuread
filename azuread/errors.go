@@ -38,7 +38,7 @@ func getErrorObject(err error) *RequestError {
 
 func isThrottlingError(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, err error) bool {
 	terr, ok := err.(*RequestError)
-	return ok && terr != nil && terr.Code == "Request_ThrottledTemporarily"
+	return ok && terr != nil && (terr.Code == "Request_ThrottledTemporarily" || terr.Code == "Directory_ReplicaUnavailable")
 }
 
 func isIgnorableErrorPredicate(ignoreErrorCodes []string) plugin.ErrorPredicateWithContext {
