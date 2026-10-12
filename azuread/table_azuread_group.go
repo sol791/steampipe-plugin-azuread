@@ -45,6 +45,10 @@ func tableAzureAdGroup(_ context.Context) *plugin.Table {
 				{Name: "security_enabled", Require: plugin.Optional, Operators: []string{"<>", "="}},
 			},
 		},
+		// Per-row hydrates are a common source of Graph API throttling
+		HydrateConfig: []plugin.HydrateConfig{
+			{Func: getAdGroupMembers, MaxConcurrency: 1},
+		},
 		Columns: commonColumns([]*plugin.Column{
 			{Name: "display_name", Type: proto.ColumnType_STRING, Description: "The name displayed in the address book for the user. This is usually the combination of the user's first name, middle initial and last name.", Transform: transform.FromMethod("GetDisplayName")},
 			{Name: "id", Type: proto.ColumnType_STRING, Description: "The unique identifier for the group.", Transform: transform.FromMethod("GetId")},
@@ -254,7 +258,8 @@ func getAdGroupMembers(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	headers.Add("ConsistencyLevel", "eventual")
 
 	requestParameters := &groups.ItemMembersRequestBuilderGetQueryParameters{
-		Count: Bool(true),
+		Select: []string{"id"},
+		Count:  Bool(true),
 	}
 
 	config := &groups.ItemMembersRequestBuilderGetRequestConfiguration{
